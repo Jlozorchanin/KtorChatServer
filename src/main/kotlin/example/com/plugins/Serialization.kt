@@ -51,7 +51,7 @@ fun Application.configureSerialization(repository: UserRepository) {
                     try {
                         val isOk = repository.addUser(account.user)
                         if (isOk) call.respond(HttpStatusCode.NoContent) else call.respond(HttpStatusCode.BadRequest,
-                            message = "user with username ${account.user.username} already exists")
+                            message = "User with username ${account.user.username} already exists")
                         repository.setUserPassword(account.user,account.password)
 
                     } catch (ex: IllegalStateException) {
@@ -216,10 +216,13 @@ fun Application.configureSerialization(repository: UserRepository) {
 
             delete("/{userId}") {
                 val userId = call.parameters["userId"]
-
+                val userPassword = call.parameters["password"]
                 if (userId == null) {
                     call.respond(HttpStatusCode.BadRequest)
                     return@delete
+                }
+                if (userId.toInt() == -1) {
+                    call.respond(HttpStatusCode.BadRequest,"There is no user with id $userId to delete" )
                 }
                 val username = repository.findUser(userId).username
                 if (repository.removeUser(userId.toInt(),username)) {
