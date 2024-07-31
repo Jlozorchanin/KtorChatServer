@@ -62,7 +62,7 @@ fun Application.configureSerialization(repository: UserRepository) {
                 } catch (e:Exception){
                     call.respond(HttpStatusCode.BadGateway,
                         Json.encodeToJsonElement(RegExample.serializer(),RegExample(message = "To create an account make post req with body like response below",
-                        UserAdv(user = User(name = "name",username = "username", friends = " ",id = null,profileImageUrl = null),
+                        UserAdv(user = User(name = "name",username = "username", friends = " ",id = null,profileImageUrl = ""),
                             password = "password"))))
                 }
 
@@ -95,7 +95,13 @@ fun Application.configureSerialization(repository: UserRepository) {
 
             }
 
+            post("/{username}/{password}/check"){
+                val username = call.parameters["username"]?: ""
+                val password =  call.parameters["password"]?: ""
 
+                call.respond(repository.checkUserPassword(username = username,password = password))
+
+            }
 
             post("/{userId}/setpic"){
                 val userId = call.parameters["userId"]
@@ -112,13 +118,16 @@ fun Application.configureSerialization(repository: UserRepository) {
 
                 val user = call.receive<User>()
                 if (userId == null) {
-                    call.respond(HttpStatusCode.BadRequest,"provide user id")
+                    call.respond(HttpStatusCode.BadRequest,"false")
                     return@post
                 }
                 repository.editUser(userId,user)
-                call.respond(HttpStatusCode.NoContent)
+                call.respond(HttpStatusCode.NoContent,"true")
 
             }
+
+
+
             post("/edit/{username}/password"){
                 val username = call.parameters["username"]?: ""
                 val oldPassword = call.parameters["oldPassword"]?: ""

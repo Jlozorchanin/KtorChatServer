@@ -32,7 +32,7 @@ data class SocketAction(
     val content : String? = ""
 )
 enum class Events{
-    NEW_MSG, CURRENT_ONLINE, SYSTEM_MSG, USER_CHANGE_ONLINE_STATUS, TIME,
+    NEW_MSG, CURRENT_ONLINE, SYSTEM_MSG, USER_CHANGE_ONLINE_STATUS, TIME
 }
 
 class MainFunc(private val repository: UserRepository){
@@ -146,11 +146,8 @@ fun Application.configureSockets(repository: UserRepository) {
     routing {
         webSocket("/chat") { // websocketSession
 
-
-
             val username = call.parameters["username"] ?: "unknown"
             val password = call.parameters["password"] ?: "unknown"
-
             if (username=="unknown" || password=="unknown") {
                 this.sendSerializedBase(
                     SocketAction(
@@ -162,6 +159,8 @@ fun Application.configureSockets(repository: UserRepository) {
                 )
                 close(CloseReason(CloseReason.Codes.NORMAL,"You should pass your username and password as a query's"))
             }
+
+
             if(!mainClass.checkPassword(username,password)){
                 this.sendSerializedBase(
                     SocketAction(
@@ -173,19 +172,17 @@ fun Application.configureSockets(repository: UserRepository) {
                 )
                 close(CloseReason(CloseReason.Codes.NORMAL,"Invalid password"))
             }
-
             val user = repository.findUser(username)
 
             val userSession = UserSession(username, this)
             mainClass.activeUsers[user.id!!] = userSession
             mainClass.broadcastUserStatus(user.id, true)
-
             val job = launch {
                 while (true){
                     sendSerializedBase(
                         SocketAction(
                             Events.TIME,
-                            (System.currentTimeMillis()/1000).toString()
+                            "${(System.currentTimeMillis()/1000)}"
                         ),
                         typeInfo = typeInfo<SocketAction>(),
                         KotlinxWebsocketSerializationConverter(Json), charset = Charsets.UTF_8
@@ -195,6 +192,20 @@ fun Application.configureSockets(repository: UserRepository) {
                 }
             }
 
+            val job2 = launch {
+                while (true){
+                    sendSerializedBase(
+                        SocketAction(
+                            Events.CURRENT_ONLINE,
+                            "${mainClass.activeUsers.keys}"
+                        ),
+                        typeInfo = typeInfo<SocketAction>(),
+                        KotlinxWebsocketSerializationConverter(Json), charset = Charsets.UTF_8
+
+                    )
+                    delay(5000)
+                }
+            }
             try {
                 for (frame in incoming) {
                     when (frame) {
