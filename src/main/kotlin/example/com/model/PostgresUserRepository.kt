@@ -149,6 +149,18 @@ class PostgresUserRepository : UserRepository {
 
     }
 
+    override suspend fun getOnlineUsersDetails(users: Array<String>): List<User> = suspendTransaction{
+        val list = mutableListOf<User>()
+        for (user in users){
+            list.add(UserDAO
+                .find{ UserTable.id eq user.toInt() }
+                .limit(1)
+                .map(::daoToModel)
+                .firstOrNull() ?: User("","-1","",-1,""))
+        }
+        return@suspendTransaction list
+    }
+
     override suspend fun setUserPassword(user: User, password: String): Unit = suspendTransaction {
         val userCurrent = UserTable.select(UserTable.username eq user.username).singleOrNull()
         if (userCurrent != null) {

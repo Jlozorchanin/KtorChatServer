@@ -62,7 +62,7 @@ fun Application.configureSerialization(repository: UserRepository) {
                 } catch (e:Exception){
                     call.respond(HttpStatusCode.BadGateway,
                         Json.encodeToJsonElement(RegExample.serializer(),RegExample(message = "To create an account make post req with body like response below",
-                        UserAdv(user = User(name = "name",username = "username", friends = " ",id = null,profileImageUrl = ""),
+                        UserAdv(user = User(name = "name",username = "username", friends = " ",id = 0,profileImageUrl = ""),
                             password = "password"))))
                 }
 

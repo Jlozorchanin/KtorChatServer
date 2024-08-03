@@ -4,27 +4,23 @@ import example.com.model.User
 import example.com.model.UserRepository
 import io.ktor.serialization.kotlinx.*
 import io.ktor.server.application.*
-import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.util.*
 import io.ktor.util.reflect.*
 import io.ktor.websocket.*
 import io.ktor.websocket.serialization.*
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.setSerialDescriptor
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonObject
-import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import kotlinx.serialization.json.Json.Default.encodeToString
 import java.time.Duration
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.coroutines.coroutineContext
-import kotlin.math.E
+import kotlin.NoSuchElementException
 
 @Serializable
 data class SocketAction(
@@ -32,7 +28,7 @@ data class SocketAction(
     val content : String? = ""
 )
 enum class Events{
-    NEW_MSG, CURRENT_ONLINE, SYSTEM_MSG, USER_CHANGE_ONLINE_STATUS, TIME
+    NEW_MSG, CURRENT_ONLINE, SYSTEM_MSG, USER_CHANGE_ONLINE_STATUS, TIME, GET_ONLINE_USER_DETAILS
 }
 
 class MainFunc(private val repository: UserRepository){
@@ -92,12 +88,20 @@ class MainFunc(private val repository: UserRepository){
     }
 
     @OptIn(InternalAPI::class)
-    suspend fun handleMessage(userId: Int, message: String, sendTo: Int) {
+    suspend fun handleMessage(userId: Int, message: String, sendTo: Int, time : Long) {
         try {
             activeUsers.getValue(sendTo).socket.sendSerializedBase(
                 SocketAction(
                     event = Events.NEW_MSG,
-                    content = (mapOf("msg" to message,"sender" to userId)).toString()
+                    content = encodeToString(
+                        MessageReceiver.serializer(),
+                        MessageReceiver(
+                            msg = message,
+                            sendTo = sendTo,
+                            sendFrom = userId,
+                            time = time
+                        )
+                    )
                     ),
                 typeInfo = typeInfo<SocketAction>(),
                 KotlinxWebsocketSerializationConverter(Json), charset = Charsets.UTF_8
@@ -203,7 +207,7 @@ fun Application.configureSockets(repository: UserRepository) {
                         KotlinxWebsocketSerializationConverter(Json), charset = Charsets.UTF_8
 
                     )
-                    delay(5000)
+                    delay(3000)
                 }
             }
             try {
@@ -213,8 +217,40 @@ fun Application.configureSockets(repository: UserRepository) {
                             val message = frame.readText()
                             try {
                                 val r = Json.decodeFromString<SocketAction>(message)
-                                val msg = r.content?.let { Json.decodeFromString<Data>(it) }
-                                mainClass.handleMessage(user.id, msg!!.msg, msg.sendTo)
+                                when(r.event){
+                                    Events.NEW_MSG -> {
+                                        val msg = r.content?.let { Json.decodeFromString<MessageReceiver>(it) }
+                                        mainClass.handleMessage(user.id, msg!!.msg, msg.sendTo, msg.time)
+                                    }
+                                    Events.CURRENT_ONLINE -> TODO()
+                                    Events.SYSTEM_MSG -> TODO()
+                                    Events.USER_CHANGE_ONLINE_STATUS -> TODO()
+                                    Events.TIME -> TODO()
+                                    Events.GET_ONLINE_USER_DETAILS -> {
+
+                                        val response = r.content.toString().replace(",","").dropLast(1).drop(1)
+                                        val tokenizer = StringTokenizer(response)
+                                        val actualArr = Array(tokenizer.countTokens()) { tokenizer.nextToken() }
+                                        this.sendSerializedBase(
+                                            SocketAction(
+                                                Events.GET_ONLINE_USER_DETAILS,
+                                                "users:${
+                                                    encodeToString(
+                                                    ListSerializer(User.serializer()),
+                                                    repository.getOnlineUsersDetails(actualArr)
+                                                )
+                                                }"
+
+                                            ),
+                                            typeInfo = typeInfo<SocketAction>(),
+                                            KotlinxWebsocketSerializationConverter(Json), charset = Charsets.UTF_8
+
+                                        )
+                                    }
+                                    null -> TODO()
+                                }
+
+
                             }
                             catch (e:Exception){
                                 this.sendSerializedBase(
@@ -245,7 +281,7 @@ fun Application.configureSockets(repository: UserRepository) {
 
 
 @Serializable
-class Data(val msg: String,val sendTo:Int)
+class MessageReceiver(val msg: String, val sendTo:Int, val sendFrom : Int, val time : Long)
 
 @Serializable
 data class UserSession(val username: String, val socket: WebSocketSession)

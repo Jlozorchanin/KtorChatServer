@@ -46,7 +46,7 @@ fun daoToModel(dao: UserDAO) = User(
     dao.username?: "",
     dao.friends,
     dao.id.value,
-    dao.pic
+    dao.pic!!
 )
 
 

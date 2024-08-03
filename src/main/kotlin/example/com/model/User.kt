@@ -19,8 +19,8 @@ data class User(
     val name: String,
     val username: String,
     val friends : String = "",
-    val id : Int?,
-    val profileImageUrl : String?
+    val id : Int,
+    val profileImageUrl : String
 )
 @Serializable
 data class UserAdv(
