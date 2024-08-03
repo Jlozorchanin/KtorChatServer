@@ -43,10 +43,10 @@ suspend fun <T> suspendTransaction(block: (Transaction) -> T): T =
 
 fun daoToModel(dao: UserDAO) = User(
     dao.name,
-    dao.username?: "",
+    dao.username,
     dao.friends,
     dao.id.value,
-    dao.pic!!
+    dao.pic
 )
 
 
